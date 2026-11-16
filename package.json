@@ -1,0 +1,45 @@
+{
+  "name": "depcage",
+  "version": "0.1.0",
+  "description": "Run npm, pnpm, yarn, bun, Vite+ and your project scripts inside an OS sandbox: secrets unreadable, network limited, writes kept in the project.",
+  "type": "module",
+  "bin": {
+    "depcage": "bin/depcage.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "license": "Apache-2.0",
+  "author": "Tarek Kharsa",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tarekkharsa/depcage.git"
+  },
+  "homepage": "https://github.com/Tarekkharsa/depcage#readme",
+  "bugs": "https://github.com/Tarekkharsa/depcage/issues",
+  "keywords": [
+    "sandbox",
+    "npm",
+    "pnpm",
+    "yarn",
+    "bun",
+    "vite-plus",
+    "supply-chain",
+    "security",
+    "postinstall",
+    "seatbelt",
+    "bubblewrap"
+  ],
+  "dependencies": {
+    "@anthropic-ai/sandbox-runtime": "0.0.83"
+  }
+}
