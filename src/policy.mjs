@@ -48,6 +48,7 @@ export const SECRET_PATHS = [
   ".npmrc", ".yarnrc.yml", ".bunfig.toml", ".pypirc", ".gem/credentials", ".cargo/credentials", ".cargo/credentials.toml",
   ".aws", ".azure", ".kube", ".docker/config.json", ".terraform.d", ".config/gcloud", ".config/gh", ".config/hub", ".config/op",
   ".claude.json", ".claude/.credentials.json", ".codex/auth.json",
+  ".config/depcage", // depcage's own record of projects, allowed hosts and history
   ".bash_history", ".zsh_history", ".node_repl_history", ".python_history",
   ".config/solana", ".ethereum", ".bitcoin", ".electrum",
   // browsers, password managers and wallets keep their data here
@@ -133,6 +134,44 @@ export function detectMode(argv, cwd = process.cwd()) {
   return "run";
 }
 
+// Commands that manage your account, programs installed for the whole computer, or the tool
+// itself. They need exactly what the sandbox hides, so the shell hook runs them without it
+// (and says so). This list is only used for commands coming from the hook.
+const DIRECT_VERBS = {
+  all: ["login", "logout", "adduser", "add-user", "whoami", "publish", "unpublish", "deprecate", "token", "owner", "access",
+    "team", "org", "profile", "stage", "dist-tag", "version", "config", "completion", "doctor", "self-update"],
+  npm: ["c", "help"],
+  pnpm: ["setup", "env", "server"],
+  yarn: ["global", "policies", "npm", "set"],
+  bun: ["upgrade"],
+  vp: ["env", "upgrade", "implode", "hooks", "help"],
+};
+export const INFO_ONLY = "it only prints information";
+const DEV_SERVER_WORDS = new Set(["dev", "start", "serve", "preview"]);
+
+/** Why a typed command should run without the sandbox, or null when it should run inside it. */
+export function directReason(argv, platform = process.platform) {
+  const tool = path.basename(argv[0] || "");
+  const args = argv.slice(1), end = args.indexOf("--");
+  if (args.length && args.every((a) => ["-v", "-V", "--version", "-h", "--help"].includes(a))) return INFO_ONLY;
+  if (!PACKAGE_MANAGERS.has(tool) && tool !== "vp") return null;
+  const own = end < 0 ? args : args.slice(0, end);
+  if (own.some((a) => a === "-g" || a === "--global" || a === "--location=global")) return "it installs or changes programs for the whole computer";
+  const words = own.filter((a) => !a.startsWith("-"));
+  const direct = new Set([...DIRECT_VERBS.all, ...DIRECT_VERBS[tool]]);
+  const fetchVerbs = tool === "vp" ? VP_FETCH_VERBS : FETCH_VERBS[tool];
+  for (const [i, w] of words.entries()) {
+    if (direct.has(w)) return "it needs your account, or changes settings outside the project";
+    const runs = RUN_VERBS.has(w) || (tool === "vp" && VP_RUN_VERBS.has(w));
+    // Linux gives the sandbox a network of its own, so a dev server inside it cannot be opened.
+    if (platform === "linux" && (DEV_SERVER_WORDS.has(w) || (runs && DEV_SERVER_WORDS.has(words[i + 1])))) {
+      return "a dev server inside the Linux sandbox cannot be opened from your browser";
+    }
+    if (runs || fetchVerbs.includes(w) || INSTALL_VERBS.has(w)) return null;
+  }
+  return null;
+}
+
 export function packageManagerOf(argv, root, env = {}) {
   const tool = path.basename(argv[0] || "");
   if (tool === "npx") return "npm";
@@ -202,6 +241,18 @@ function splitEnv(env, keep) {
 
 const expandHome = (p, home) => (p === "~" ? home : p.startsWith("~/") ? path.join(home, p.slice(2)) : p);
 
+const real = (p) => { try { return fs.realpathSync.native(p); } catch { return path.resolve(p); } };
+
+/** The folder a command may write to. Throws when that would be the home folder or the whole disk. */
+export function resolveRoot({ cwd, home, otherHomes = [] }) {
+  const homes = [...new Set([real(home), ...otherHomes.map(real)])];
+  const root = findProjectRoot(real(cwd), homes);
+  if (root === path.parse(root).root || homes.some((h) => isInside(h, root))) {
+    throw new Error(`refusing to treat ${root} as the project folder. Run depcage from inside a project.`);
+  }
+  return root;
+}
+
 /**
  * @param {object} o
  * @param {string[]} o.argv       the command to run
@@ -215,14 +266,10 @@ const expandHome = (p, home) => (p === "~" ? home : p.startsWith("~/") ? path.jo
  * @param {number} [o.uid]        numeric user id, used for per-user lock paths
  */
 export function buildPolicy({ argv, cwd, home, otherHomes = [], env, platform, options = {}, ownDirs = [], uid, nodeMajor = Number(process.versions.node.split(".")[0]) }) {
-  const real = (p) => { try { return fs.realpathSync.native(p); } catch { return path.resolve(p); } };
   cwd = real(cwd); home = real(home);
   const homes = [...new Set([home, ...otherHomes.map(real)])];
   const mode = options.mode || detectMode(argv, cwd);
-  const root = findProjectRoot(cwd, homes);
-  if (root === path.parse(root).root || homes.some((h) => isInside(h, root))) {
-    throw new Error(`refusing to treat ${root} as the project folder. Run depcage from inside a project.`);
-  }
+  const root = resolveRoot({ cwd, home, otherHomes });
   const abs = (p) => path.resolve(cwd, expandHome(p, home));
   const allowRead = (options.allowRead || []).map(abs);
 

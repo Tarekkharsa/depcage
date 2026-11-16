@@ -60,6 +60,72 @@ npm install -g depcage
 Install it globally, not as a dependency of the project it protects. Requires Node 22.12 or
 newer. macOS needs nothing else. Linux needs `bubblewrap`, `socat` and `ripgrep`.
 
+## Use it without typing it
+
+```
+depcage setup
+```
+
+This adds a block to your shell start-up file (zsh or bash). In every new terminal, `npm`,
+`npx`, `pnpm`, `yarn`, `bun` and `vp` commands that you type then run inside the sandbox:
+
+```
+$ npm install
+depcage: install mode · internet: registry.npmjs.org, nodejs.org · 2 secret-looking variables held back
+...
+$ npm test
+depcage: run mode · internet: off · 2 secret-looking variables held back
+```
+
+- **Commands that cannot work in a sandbox run without it**, and depcage says so: the ones that
+  need your account (`npm login`, `npm publish`, `npm whoami`), change programs for the whole
+  computer (`npm install -g`), or manage the tool itself (`vp env`, `bun upgrade`).
+- **Skip the sandbox for one command** with `DEPCAGE=off npm run deploy`.
+- **Only commands you type are covered.** Scripts, editors and CI call the real programs. In CI,
+  write `depcage` in front of the command.
+- **In your home folder itself, the command is refused**, because there is no project folder to
+  keep writes in. Run it from a project folder, or with `DEPCAGE=off`.
+- **On Linux, dev servers run without the sandbox** (`npm run dev`, `npm start`, `vp dev`),
+  because a server inside the Linux sandbox cannot be opened from your browser.
+- Undo it with `depcage setup --remove`.
+
+### Remember a permission for a project
+
+When a project really needs something, say it once:
+
+```
+depcage allow net api.example.com     # this project may reach this host
+depcage allow read ~/.npmrc           # a private registry login
+depcage allow env SENTRY_AUTH_TOKEN   # pass this variable
+depcage allow browser                 # Playwright or Puppeteer tests on macOS
+depcage allow                         # show what is remembered
+depcage allow --remove net api.example.com
+```
+
+These are stored in `~/.config/depcage`, outside the project, where a sandboxed command cannot
+write. A dependency cannot give itself more permissions.
+
+### See what was blocked
+
+```
+$ depcage report
+depcage report: my-app, last 30 days
+
+  Commands run inside the sandbox   214  (38 installs, 176 others)
+  Commands run without it           3  (npm publish ×2, npm login ×1)
+
+  Network destinations blocked
+    registry.npmjs.org:443                 12 times   from: npx next
+    telemetry.example.com:443              3 times    from: npm test
+
+  Secret-looking environment variables held back
+    NPM_TOKEN                              in 214 of 214 commands
+```
+
+`depcage report --all` covers every project. The history holds the command name (such as
+`npm test`), blocked hosts and variable names, never arguments or values, and it stays on your
+computer.
+
 ## What each command gets
 
 depcage looks at the command and picks one of two sets of rules.
@@ -97,6 +163,8 @@ Options go before the command.
 | `--no-local` / `--local` | block or allow connections to this computer |
 | `--mode <install\|run>` | choose the rules by hand |
 | `--browser` | let the command start a browser (Playwright, Puppeteer) on macOS |
+
+Each `--allow-…` option, `--keep-env` and `--browser` can be remembered for a project with `depcage allow`.
 | `--print-policy` | show the rules for a command and exit |
 | `-q`, `--quiet` | no summary lines |
 
@@ -195,6 +263,9 @@ Read these before relying on it.
   file. Use `--allow-read` for that file. Yarn 2 and later is not affected. Switching a project
   from Yarn 1 to a newer Yarn (`yarn set version`) downloads from `github.com`; do that step
   without depcage.
+- **The shell hook is a convenience, not a guarantee.** It covers what you type in zsh or bash.
+  An alias, a script or another program that starts `npm` is not covered, and the account
+  commands listed above run unsandboxed.
 - **`watchman` cannot be started inside the sandbox.** It talks to a daemon outside it, which
   would be a way out. Jest and similar tools fall back to their built-in file scanning.
 
