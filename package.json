@@ -1,6 +1,6 @@
 {
   "name": "depcage",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Run npm, pnpm, yarn, bun, Vite+ and your project scripts inside an OS sandbox: secrets unreadable, network limited, writes kept in the project.",
   "type": "module",
   "bin": {
