@@ -21,7 +21,7 @@ The sandbox itself is [`@anthropic-ai/sandbox-runtime`](https://github.com/anthr
 (`sandbox-exec` on macOS, `bubblewrap` on Linux). depcage adds the part that makes it usable
 for JavaScript projects without writing a policy: it picks sensible rules from the command you run.
 
-> Status: an early version, tested on one Mac and in one Linux container. See [Tested with](#tested-with) and [Limits](#limits).
+> Status: an early version. The tests and the demo run on macOS and Linux for every change. See [Tested with](#tested-with) and [Limits](#limits).
 
 ## See it work
 
@@ -153,8 +153,9 @@ On Linux (Debian in a privileged Docker container, arm64, Node 22, bubblewrap 0.
 - the test suite and the demo
 - `npm install` on a machine with no npm cache yet, Vitest, esbuild's native binary
 
-Not tested yet: a real Linux machine or CI runner, Windows (not supported; WSL 2 should behave
-like Linux), Firefox and WebKit in Playwright, Playwright on Linux, Turborepo and Nx.
+On GitHub's macOS and Ubuntu runners, Node 22 and 24, for every change: the test suite and the demo.
+
+Not tested yet: Windows (not supported; WSL 2 should behave like Linux), Firefox and WebKit in Playwright, Playwright on Linux, Turborepo and Nx.
 
 ## Limits
 
