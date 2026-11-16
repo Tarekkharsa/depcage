@@ -9,6 +9,7 @@
   "files": [
     "bin",
     "src",
+    "npm-shrinkwrap.json",
     "README.md",
     "LICENSE"
   ],
