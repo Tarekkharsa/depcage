@@ -115,9 +115,16 @@ test("end to end: allow is remembered, the hook mode skips account commands, the
 
   // a sandboxed command tries to give itself more permissions, even with the folder above made writable
   const store = path.join(fx.home, ".config", "depcage", "projects.json");
-  const attack = `try{require('fs').writeFileSync(${JSON.stringify(store)},'{"projects":{}}');console.log('WROTE')}catch(e){console.log('DENIED')}`;
-  assert.match(run(fx, ["--allow-write", path.join(fx.home, ".config"), "node", "-e", attack]).stdout, /DENIED/);
-  assert.match(fs.readFileSync(store, "utf8"), /api\.example\.com/);
+  const before = fs.readFileSync(store, "utf8");
+  const planted = path.join(fx.home, ".config", "depcage", "planted.txt");
+  const attack = `const fs=require('fs');for(const f of ${JSON.stringify([store, planted])}){try{fs.writeFileSync(f,'{"projects":{}}');console.log('WROTE')}catch(e){console.log('DENIED')}}`;
+  const attempt = run(fx, ["--allow-write", path.join(fx.home, ".config"), "node", "-e", attack]);
+  // macOS refuses the write. Linux shows the command an empty stand-in folder, so the write
+  // "works" and is thrown away. Either way the real record must be untouched.
+  if (process.platform === "darwin") assert.equal(attempt.stdout, "DENIED\nDENIED\n");
+  assert.equal(fs.readFileSync(store, "utf8"), before);
+  assert.equal(fs.existsSync(planted), false);
+  assert.match(before, /api\.example\.com/);
 
   const report = run(fx, ["report"]).stdout;
   assert.match(report, /inside the sandbox\s+1/);
